@@ -17,18 +17,7 @@ from . import models
 ImageFile.LOAD_TRUNCATED_IMAGES = True  # Allow loading truncated images
 
 def is_car_dirty(img, mask_model=maskrcnn_resnet50_fpn(weights='default'), determine_model=models.conv_4layer(weights='C:\Users\fooli\Desktop\image rec\RCNN-based-detection\best_model_car_masked_simple_80.84.pth'), threshold=0.7):
-    """
-    Determine if a car in an image is dirty based on its mask and a classification model.
-    
-    Args:
-        img (PIL.Image): Input image.
-        mask_model (torch.nn.Module): Pre-trained Mask R-CNN model for detecting cars.
-        determine_model (torch.nn.Module): Pre-trained model for determining if a car is dirty.
-        threshold (float): Confidence threshold for detections.
-        
-    Returns:
-        bool: True if the car is dirty, False otherwise.
-    """
+
     mask = m.get_largest_car(img, mask_model, threshold)
     
     if mask is None:
