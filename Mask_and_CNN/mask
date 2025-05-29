@@ -1,0 +1,73 @@
+import torch
+import os
+import torchvision
+import numpy as np
+import matplotlib.pyplot as plt
+from torchvision.models.detection import maskrcnn_resnet50_fpn
+from torchvision.datasets import CocoDetection
+import torchvision.transforms as T
+from PIL import Image, ImageFile
+from pathlib import Path
+
+ImageFile.LOAD_TRUNCATED_IMAGES = True  # Allow loading truncated images#
+
+def get_largest_car(img, model=maskrcnn_resnet50_fpn(weights='default'), threshold=0.7):
+    
+    """
+    Get the largest car mask from an image using a pre-trained Mask R-CNN model.
+    
+    Args:
+        img (PIL.Image): Input image.
+        model (torch.nn.Module): Pre-trained Mask R-CNN model.
+        threshold (float): Confidence threshold for detections.
+        
+    Returns:
+        numpy.ndarray: Binary mask of the largest car detected in the image.
+    """
+    transform = T.Compose([T.ToTensor()])
+    img_tensor = transform(img).unsqueeze(0)  # Add batch dimension
+    model.eval()
+    
+    with torch.no_grad():
+        predictions = model(img_tensor)
+    
+    masks = predictions[0]['masks']
+    boxes = predictions[0]['boxes']
+    scores = predictions[0]['scores']
+    labels = predictions[0]['labels']
+    
+    # Filter for cars (label 2 in COCO dataset)
+    car_indices = (labels == 3) & (scores > threshold)
+    
+    if not car_indices.any():
+        return None  # No cars detected above threshold
+    
+    car_masks = masks[car_indices].squeeze(1).cpu().numpy()
+    
+    # Find the largest car mask
+    largest_mask = None
+    max_area = 0
+    
+    for mask in car_masks:
+        area = np.sum(mask)
+        if area > max_area:
+            max_area = area
+            largest_mask = mask
+    
+    return largest_mask if largest_mask is not None else None
+
+def mask_image(image, mask):
+    """
+    Apply a mask to an image.
+    
+    Args:
+        image (PIL.Image): Input image.
+        mask (numpy.ndarray): Binary mask to apply.
+        
+    Returns:
+        PIL.Image: Masked image.
+    """
+    masked_image = np.array(image).copy()
+    masked_image[~mask] = 0  # Set pixels outside the mask to black
+    return Image.fromarray(masked_image)
+
