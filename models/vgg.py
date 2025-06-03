@@ -24,6 +24,38 @@ class ResidualBlock(nn.Module):
         
         out += identity
         return F.leaky_relu(out)
+    
+
+class SEBlock(nn.Module):
+    def __init__(self, channels, reduction=1):
+        super(SEBlock, self).__init__()
+        self.fc1 = nn.Linear(channels, channels // reduction)
+        self.fc2 = nn.Linear(channels // reduction, channels)
+        
+
+    def forward(self, x):
+        batch_size, channels, _, _ = x.size()
+        y = F.adaptive_avg_pool2d(x, 1).view(batch_size, channels)
+        y = F.relu(self.fc1(y))
+        y = torch.sigmoid(self.fc2(y)).view(batch_size, channels, 1, 1)
+        return x * y
+    
+class SE_ResidualBlock(nn.Module):
+    def __init__(self, channels, kernel_size=3, stride=1, padding=1):
+        super(SE_ResidualBlock, self).__init__()
+        self.conv1 = nn.Conv2d(channels, channels, kernel_size, stride, padding)
+        self.conv2 = nn.Conv2d(channels, channels, kernel_size, stride, padding)
+        self.bn2 = nn.BatchNorm2d(channels)
+        self.se_block = SEBlock(channels)
+
+    def forward(self, x):
+        identity = x
+        out = F.leaky_relu(self.conv1(x))
+        out = F.leaky_relu(self.bn2(self.conv2(out)))
+        out = self.se_block(out)
+        
+        out += identity
+        return F.leaky_relu(out)
 
 class Resnetlike(nn.Module):
     def __init__(self):
