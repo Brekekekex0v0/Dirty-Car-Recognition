@@ -25,9 +25,9 @@ class ResidualBlock(nn.Module):
         out += identity
         return F.leaky_relu(out)
 
-class VGG8like(nn.Module):
+class Resnetlike(nn.Module):
     def __init__(self):
-        super(VGG8like, self).__init__()
+        super(Resnetlike, self).__init__()
         # Convolutional layers
         self.projection0 = nn.Conv2d(3, 16, 1)
         self.conv1 = nn.Conv2d(3, 16, 3, 1, 1)
