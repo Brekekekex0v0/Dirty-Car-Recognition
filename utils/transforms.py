@@ -1,4 +1,3 @@
-```python
 import numpy as np
 from PIL import Image
 from torchvision import transforms
@@ -45,4 +44,3 @@ def get_transform(augment=True):
         transforms.ToTensor()
     ])
     return transform
-```

@@ -1,6 +1,8 @@
 import torch
 from torch import nn
 
+num_classes = 0
+
 def train_loop(dataloader, model, loss_fn, optimizer, device):
     size = len(dataloader.dataset)
     model.train()

@@ -114,3 +114,120 @@ class Resnetlike(nn.Module):
         x = F.leaky_relu(self.fc2(x))
 
         return x
+    
+
+class VGGlike(nn.Module):
+    def __init__(self):
+        super(VGGlike, self).__init__()
+        # Convolutional layers
+        self.conv1 = nn.Conv2d(3, 16, 3, 1, 1)
+        self.conv2 = nn.Conv2d(16, 16, 3, 1, 1)
+        self.conv3 = nn.Conv2d(16, 16, 3, 1, 1)
+        self.bn1 = nn.BatchNorm2d(16)
+
+        self.conv4 = nn.Conv2d(16, 32, 3, 1, 1)
+        self.conv5 = nn.Conv2d(32, 32, 3, 1, 1)
+        self.bn2 = nn.BatchNorm2d(32)
+
+        self.conv6 = nn.Conv2d(32, 64, 3, 1, 1)
+        self.conv7 = nn.Conv2d(64, 64, 3, 1, 1)
+        self.bn3 = nn.BatchNorm2d(64)
+
+        self.conv8 = nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1)
+        self.bn4 = nn.BatchNorm2d(128)
+
+        self.conv9 = nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1)
+        self.bn5 = nn.BatchNorm2d(256)
+
+        self.conv10 = nn.Conv2d(256, 512, kernel_size=3, stride=1, padding=1)
+        self.bn6 = nn.BatchNorm2d(512)
+
+        # Fully connected layers
+        self.fc1 = nn.Linear(512 * (1024 // (32 * 2)) * (768 // (32 * 2)), 4096)  
+        self.fc2 = nn.Linear(4096, 2)
+
+        self.spatial_dropout = nn.Dropout2d(p=0.2)  # Spatial dropout
+
+        # Initialize weights
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='leaky_relu')
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='leaky_relu')
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+    def forward(self, x):
+        x = F.leaky_relu(self.conv1(x))
+        x = F.leaky_relu(self.conv2(x)) 
+        x = F.leaky_relu(self.bn1(self.conv3(x)))
+        x = F.max_pool2d(x, 2, 2)
+        x = F.leaky_relu(self.conv4(x))
+        x = F.leaky_relu(self.bn2(self.conv5(x)))
+        x = F.max_pool2d(x, 2, 2)
+        x = F.leaky_relu(self.conv6(x))
+        x = F.leaky_relu(self.bn3(self.conv7(x)))
+        x = F.max_pool2d(x, 2, 2)
+        x = F.leaky_relu(self.bn4(self.conv8(x)))
+        x = F.max_pool2d(x, 2, 2)
+        x = F.leaky_relu(self.bn5(self.conv9(x)))
+        x = F.max_pool2d(x, 2, 2)
+        x = F.leaky_relu(self.bn6(self.conv10(x)))
+        x = F.max_pool2d(x, 2, 2)
+
+        x = x.view(x.size(0), -1)  # Flatten the output
+        if self.training:  
+            x = self.spatial_dropout(x)
+
+        x = F.leaky_relu(self.fc1(x))
+        x = F.leaky_relu(self.fc2(x))
+        return x
+
+
+class conv_4layer(nn.Module):
+    def __init__(self):
+        super(conv_4layer, self).__init__()
+        # Convolutional layers
+        self.conv1 = nn.Conv2d(3, 6, 11, 4, 5)
+        self.bn1 = nn.BatchNorm2d(6)
+        self.conv2 = nn.Conv2d(6, 6, 5, 2, 2)
+        self.bn2 = nn.BatchNorm2d(6)
+        self.conv3 = nn.Conv2d(6, 8, 5, 1, 2)
+        self.bn3 = nn.BatchNorm2d(8)
+        self.conv4 = nn.Conv2d(8, 8, 5, 1, 2)
+        self.bn4 = nn.BatchNorm2d(8)
+        self.fc1 = nn.Linear(8*8*5, 16)
+        self.fc2 = nn.Linear(16, 2)
+
+        # Initialize weights
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='leaky_relu')
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='leaky_relu')
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
+    def forward(self, x):
+        x = F.leaky_relu(self.bn1(self.conv1(x)))
+        x = F.max_pool2d(x, 2, 2)
+        x = F.leaky_relu(self.bn2(self.conv2(x)))
+        x = F.max_pool2d(x, 2, 2)
+        x = F.leaky_relu(self.bn3(self.conv3(x)))
+        x = F.max_pool2d(x, 2, 2)
+        x = F.leaky_relu(self.bn4(self.conv4(x)))
+        x = F.max_pool2d(x, 2, 2)
+        x = x.view(x.size(0), -1) 
+        if self.training:
+            x = F.dropout(x, p=0.5)
+        x = F.leaky_relu(self.fc1(x))
+        x = F.leaky_relu(self.fc2(x))
+
+        return x
