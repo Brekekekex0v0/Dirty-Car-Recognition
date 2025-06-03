@@ -1,0 +1,89 @@
+import os
+import torch
+from torch import nn
+from torch.utils.data import DataLoader
+from sklearn.model_selection import KFold
+import pandas as pd
+
+from models.vgg import VGG8like
+from data.datasets import JPGImageDataset
+from utils.transforms import get_transform
+from utils.training import train_loop, test_loop
+
+def main():
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    # Configuration
+    annotations_file = r"C:\Users\fooli\Desktop\Masked ver 02\annotation_2.csv"
+    img_dir = r"C:\Users\fooli\Desktop\Masked ver 02"
+    num_epochs = 1000
+    batch_size = 8
+    learning_rate = 0.0001
+    num_classes = 2
+    num_folds = 5
+    
+    # Setup K-Fold Cross Validation
+    df = pd.read_csv(annotations_file)
+    kf = KFold(n_splits=num_folds, shuffle=True, random_state=42)
+    
+    transform = get_transform(phase='train')
+    
+    for fold, (train_idx, val_idx) in enumerate(kf.split(df)):
+        print(f"Fold {fold+1}")
+        
+        # Clear CUDA cache
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        
+        train_losses = []
+        test_losses = []
+        train_accuracies = []
+        test_accuracies = []
+        
+        # Split into training and validation dataframes
+        train_df = df.iloc[train_idx].reset_index(drop=True)
+        val_df = df.iloc[val_idx].reset_index(drop=True)
+
+        # Save to temporary CSVs
+        train_df.to_csv('train_temp.csv', index=False)
+        val_df.to_csv('val_temp.csv', index=False)
+
+        # Create datasets
+        print("Initializing datasets...")
+        train_dataset = JPGImageDataset('train_temp.csv', image_paths=img_dir, transform=transform, augment_times=1)
+        val_dataset = JPGImageDataset('val_temp.csv', image_paths=img_dir, transform=transform, augment_times=1)
+        print("Datasets initialized. Starting training...")
+
+        # Create dataloaders
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
+        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, pin_memory=True)
+
+        # Calculate class weights
+        class_counts = train_df.iloc[:, 1].value_counts().values
+        weights = 1.0 / torch.tensor(class_counts, dtype=torch.float)
+        weights = weights / weights.sum()
+        class_weights = weights.to(device)
+
+        # Initialize model and optimizer
+        model = VGG8like().to(device)
+        loss_fn = nn.CrossEntropyLoss(weight=class_weights)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=0.005, betas=(0.7, 0.999))
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=20, min_lr=1e-5)
+
+        # Train model
+        for epoch in range(num_epochs):
+            print(f"Epoch {epoch+1}")
+            train_loop(train_loader, model, loss_fn, optimizer, device)
+            val_loss = test_loop(val_loader, model, loss_fn, device)
+            
+            current_lr = optimizer.param_groups[0]['lr']
+            if val_loss is not None:
+                scheduler.step(val_loss)
+                new_lr = optimizer.param_groups[0]['lr']
+                if new_lr != current_lr:
+                    print(f"Learning rate decreased from {current_lr:.6f} to {new_lr:.6f}")
+            else:
+                print("Warning: val_loss is None, skipping scheduler step.")
+
+if __name__ == "__main__":
+    main()
